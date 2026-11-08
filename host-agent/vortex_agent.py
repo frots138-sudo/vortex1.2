@@ -286,6 +286,36 @@ def kill_host_browser():
         subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True)
 
 
+def run_elevated(path, args):
+    """Abre como administrador (jogos que exigem elevação). Retorna o PID."""
+    class SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("fMask", ctypes.c_ulong), ("hwnd", wintypes.HWND),
+                    ("lpVerb", wintypes.LPCWSTR), ("lpFile", wintypes.LPCWSTR), ("lpParameters", wintypes.LPCWSTR),
+                    ("lpDirectory", wintypes.LPCWSTR), ("nShow", ctypes.c_int), ("hInstApp", wintypes.HINSTANCE),
+                    ("lpIDList", ctypes.c_void_p), ("lpClass", wintypes.LPCWSTR), ("hkeyClass", wintypes.HKEY),
+                    ("dwHotKey", wintypes.DWORD), ("hIcon", wintypes.HANDLE), ("hProcess", wintypes.HANDLE)]
+    sei = SHELLEXECUTEINFOW(cbSize=ctypes.sizeof(SHELLEXECUTEINFOW), fMask=0x00000040, lpVerb="runas",
+                            lpFile=path, lpParameters=args or None, lpDirectory=os.path.dirname(path), nShow=1)
+    if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+        raise OSError("O Windows recusou abrir o jogo como administrador (UAC cancelado?)")
+    kernel32 = ctypes.windll.kernel32
+    kernel32.GetProcessId.argtypes = [wintypes.HANDLE]
+    pid = kernel32.GetProcessId(sei.hProcess) if sei.hProcess else 0
+    if sei.hProcess:
+        kernel32.CloseHandle(sei.hProcess)
+    return pid
+
+
+def spawn(path, args, status):
+    try:
+        return subprocess.Popen([path] + (args.split() if args else []), cwd=os.path.dirname(path)).pid
+    except OSError as e:
+        if not (IS_WIN and getattr(e, "winerror", 0) == 740):
+            raise
+        status("launching", "O jogo exige administrador: confirme o aviso do Windows no PC (ou rode o agente como administrador).")
+        return run_elevated(path, args)
+
+
 class Session:
     """Abre o executável do jogo, coloca em tela cheia/primeiro plano e (modo site) transmite."""
 
@@ -366,7 +396,7 @@ class Session:
         if IS_WIN and path.lower().endswith((".lnk", ".url")):
             os.startfile(path)
         else:
-            self.pids.add(subprocess.Popen([path] + (args.split() if args else []), cwd=os.path.dirname(path)).pid)
+            self.pids.add(spawn(path, args, status))
 
         deadline = time.time() + cfg["wait"]
         while time.time() < deadline and not self.hwnd and not self.quit_evt.is_set():

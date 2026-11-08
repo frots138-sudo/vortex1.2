@@ -646,6 +646,12 @@ async def download_agent_bat(site: str, user: dict = Depends(require_admin)):
     pwd = os.environ.get("ADMIN_PASSWORD", "") if user["email"] == os.environ.get("ADMIN_EMAIL") else ""
     lines = [
         "@echo off", "chcp 65001 >nul",
+        "REM Roda como administrador: necessario para jogos que exigem elevacao e para os controles funcionarem neles",
+        "net session >nul 2>&1",
+        "if %errorlevel% neq 0 (",
+        "  powershell -NoProfile -Command \"Start-Process -FilePath '%~f0' -Verb RunAs\"",
+        "  exit /b",
+        ")",
         "REM Vortex - agente do PC (gerado pelo site). Nao compartilhe este arquivo.",
         f'set "VORTEX_SITE={_bat(site.rstrip("/"))}"',
         f'set "VORTEX_EMAIL={_bat(user["email"])}"',
