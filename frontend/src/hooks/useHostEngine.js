@@ -124,6 +124,9 @@ export default function useHostEngine() {
     dc.onopen = () => dc.send(JSON.stringify({ t: "agent", ok: agentWs.current?.readyState === 1 }));
     dc.onmessage = (e) => handleViewerMsg(id, JSON.parse(e.data));
     entry.dc = dc;
+    // fast lane for controller state: no retransmits, no head-of-line blocking (viewer resends state every 100ms)
+    const pad = pc.createDataChannel("pad", { ordered: false, maxRetransmits: 0 });
+    pad.onmessage = (e) => toAgent(JSON.parse(e.data));
     pc.onicecandidate = (e) => e.candidate && sig.current?.send({ type: "ice", to: id, candidate: e.candidate });
     pc.onconnectionstatechange = () => {
       if (peers.current.get(id) !== entry) return;

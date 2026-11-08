@@ -328,6 +328,7 @@ class Session:
         self.before = set()
         self.quit_evt = threading.Event()
         self.timer = None
+        self.last_focus = 0.0
 
     @property
     def busy(self):
@@ -411,27 +412,11 @@ class Session:
         status("launching", "Jogo aberto em tela cheia, aguardando carregar…")
         time.sleep(4)
         if stream:
-            browser = find_browser(cfg["browser"])
-            if not browser:
+            if not find_browser(cfg["browser"]):
                 kill_pids(self.pids)
                 return status("error", "Chrome ou Edge não encontrado no PC.")
-            kill_host_browser()
-            source = "Entire screen" if cfg["capture"] == "tela" else (window_title(self.hwnd) or title)
-            q = urlencode({"token": cfg["token"], "game": m["game_id"], "pin": cfg["pin"],
-                           "audio": cfg["audio"], "mode": cfg["capture"]})
-            status("capturing", "Iniciando transmissão…")
-            subprocess.Popen([
-                browser, f"--user-data-dir={PROFILE}", f"--app={cfg['site']}/host-auto?{q}", "--lang=en-US",
-                f"--auto-select-desktop-capture-source={source}", "--use-fake-ui-for-media-stream",
-                "--autoplay-policy=no-user-gesture-required", "--disable-background-timer-throttling",
-                "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows",
-                "--disable-features=CalculateNativeWinOcclusion",
-                "--no-first-run", "--no-default-browser-check", "--window-size=420,300", "--window-position=0,0",
-            ])
-            for _ in range(5):  # garante o jogo na frente da janelinha do Chrome
-                time.sleep(2)
-                if window_alive(self.hwnd):
-                    focus(self.hwnd)
+            status("capturing", "Iniciando transmissão só da janela do jogo…" if cfg["capture"] == "janela" else "Iniciando transmissão…")
+            self._start_browser(m, cfg)
         status("running", f"{title} rodando em tela cheia no PC.")
 
         gone = 0
@@ -442,12 +427,43 @@ class Session:
             if best and best[0] != self.hwnd and (not alive or best[2] * best[3] > 1.2 * self._area()):
                 self._adopt(best[0], cfg)  # launcher -> janela real do jogo
                 alive = True
+                if stream and cfg["capture"] == "janela":
+                    status("capturing", "Trocando a transmissão para a janela do jogo…")
+                    self._start_browser(m, cfg)
             gone = 0 if alive else gone + 2
             if gone >= 20:
                 break
         if self.quit_evt.is_set():
             kill_pids(self.pids)
         status("ended", f"{title} foi fechado no PC.")
+
+    def _start_browser(self, m, cfg):
+        """Chrome dedicado que captura SÓ a janela do jogo (fica presa nela mesmo trocando de janela no PC)."""
+        kill_host_browser()
+        source = "Entire screen" if cfg["capture"] == "tela" else (window_title(self.hwnd) or self.title)
+        q = urlencode({"token": cfg["token"], "game": m["game_id"], "pin": cfg["pin"],
+                       "audio": cfg["audio"], "mode": cfg["capture"]})
+        subprocess.Popen([
+            find_browser(cfg["browser"]), f"--user-data-dir={PROFILE}", f"--app={cfg['site']}/host-auto?{q}",
+            "--lang=en-US", f"--auto-select-desktop-capture-source={source}", "--use-fake-ui-for-media-stream",
+            "--autoplay-policy=no-user-gesture-required", "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows",
+            "--disable-features=CalculateNativeWinOcclusion",
+            "--no-first-run", "--no-default-browser-check", "--window-size=420,300", "--window-position=0,0",
+        ])
+        for _ in range(5):  # garante o jogo na frente da janelinha do Chrome
+            time.sleep(2)
+            if window_alive(self.hwnd):
+                focus(self.hwnd)
+
+    def keep_focus(self):
+        """Controles do celular sempre vão para o jogo, mesmo se alguém trocar de janela no PC."""
+        now = time.time()
+        if not IS_WIN or not window_alive(self.hwnd) or now - self.last_focus < 1:
+            return
+        self.last_focus = now
+        if user32.GetForegroundWindow() != self.hwnd:
+            focus(self.hwnd)
 
     def _area(self):
         w = next((w for w in list_windows() if w[0] == self.hwnd), None)
@@ -526,6 +542,8 @@ def sunshine_sync(apps, cfg):
 # ---------------------------------------------------------------- servidor local
 def handle(msg):
     t = msg.get("t")
+    if t in ("k", "mm", "ma", "mb", "mw", "gp") and session.busy:
+        session.keep_focus()
     if t == "k":
         key(msg["code"], msg["down"])
     elif t == "mm":
@@ -600,7 +618,7 @@ async def main():
     ap.add_argument("--site", default=os.environ.get("VORTEX_SITE", ""), help="Endereço do site Vortex")
     ap.add_argument("--email", default=os.environ.get("VORTEX_EMAIL", ""))
     ap.add_argument("--password", default=os.environ.get("VORTEX_PASS", ""))
-    ap.add_argument("--capture", default=os.environ.get("VORTEX_CAPTURA") or "tela", choices=["janela", "tela"])
+    ap.add_argument("--capture", default=os.environ.get("VORTEX_CAPTURA") or "janela", choices=["janela", "tela"])
     ap.add_argument("--audio", default=os.environ.get("VORTEX_AUDIO", ""), help="Dispositivo de áudio (ex.: Mixagem estéreo)")
     ap.add_argument("--browser", default=os.environ.get("VORTEX_BROWSER", ""))
     ap.add_argument("--wait", type=int, default=120, help="Segundos esperando a janela do jogo")

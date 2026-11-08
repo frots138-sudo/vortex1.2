@@ -8,13 +8,15 @@ export default function useViewerEngine({ onHostMsg }) {
   const videoRef = useRef(null);
   const pc = useRef(null);
   const dc = useRef(null);
+  const padDc = useRef(null);
   const sock = useRef(null);
   const pending = useRef([]);
   const hostMsg = useRef(onHostMsg);
   hostMsg.current = onHostMsg;
 
   const send = useCallback((m) => {
-    if (dc.current?.readyState === "open") dc.current.send(JSON.stringify(m));
+    const ch = m.t === "gp" && padDc.current?.readyState === "open" ? padDc.current : dc.current;
+    if (ch?.readyState === "open") ch.send(JSON.stringify(m));
   }, []);
   const sendSig = useCallback((o) => sock.current?.send(o), []);
 
@@ -28,6 +30,7 @@ export default function useViewerEngine({ onHostMsg }) {
       try { pc.current?.close(); } catch { /* noop */ }
       pc.current = null;
       dc.current = null;
+      padDc.current = null;
       pending.current = [];
     };
     const sig = (o) => sock.current?.send(o);
@@ -55,6 +58,7 @@ export default function useViewerEngine({ onHostMsg }) {
         }
       };
       p.ondatachannel = (e) => {
+        if (e.channel.label === "pad") { padDc.current = e.channel; return; }
         dc.current = e.channel;
         e.channel.onmessage = (ev) => hostMsg.current?.(JSON.parse(ev.data));
         e.channel.onopen = () => hostMsg.current?.({ t: "channel-open" });

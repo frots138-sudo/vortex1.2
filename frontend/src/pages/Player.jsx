@@ -203,6 +203,7 @@ export default function Player() {
         </div>
         <div className="pointer-events-auto flex gap-2">
           <button onClick={toggleSound} data-testid="player-sound" className="vx-btn bg-black/60 p-2.5 text-white backdrop-blur">{muted ? <VolumeX className="h-5 w-5 text-amber-400" /> : <Volume2 className="h-5 w-5" />}</button>
+          <button onClick={() => setMode(mode === "gamepad" ? (IS_TOUCH ? "touchpad" : "mouse") : "gamepad")} data-testid="player-pad-toggle" className={`vx-btn p-2.5 backdrop-blur ${mode === "gamepad" ? "bg-[#107C10] text-white" : "bg-black/60 text-white"}`} aria-label="Controle Xbox na tela"><Gamepad2 className="h-5 w-5" /></button>
           <button onClick={() => setMenu((m) => !m)} data-testid="player-menu-button" className="vx-btn bg-black/60 p-2.5 text-white backdrop-blur"><Settings2 className="h-5 w-5" /></button>
           <button onClick={fullscreen} data-testid="player-fullscreen" className="vx-btn bg-black/60 p-2.5 text-white backdrop-blur"><Maximize className="h-5 w-5" /></button>
         </div>

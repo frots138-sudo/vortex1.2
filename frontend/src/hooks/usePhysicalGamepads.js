@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const dz = (v) => (Math.abs(v) < 0.08 ? 0 : Math.round(v * 100) / 100);
+const dz = (v) => (Math.abs(v) < 0.08 ? 0 : Math.round(v * 1000) / 1000);
 
 function readPad(g) {
   let b = 0;
@@ -34,14 +34,17 @@ export default function usePhysicalGamepads(send, enabled) {
   useEffect(() => {
     if (!enabled || !pads.length) return undefined;
     const last = {};
+    const sent = {};
     let raf;
     const loop = () => {
+      const now = performance.now();
       for (const g of navigator.getGamepads()) {
         if (!g) continue;
         const st = readPad(g);
         const key = JSON.stringify(st);
-        if (last[g.index] !== key) {
+        if (last[g.index] !== key || now - (sent[g.index] || 0) > 100) {
           last[g.index] = key;
+          sent[g.index] = now;
           send({ t: "gp", slot: g.index + 1, ...st });
         }
       }

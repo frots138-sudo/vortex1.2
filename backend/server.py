@@ -659,8 +659,8 @@ async def download_agent_bat(site: str, user: dict = Depends(require_admin)):
         "REM Usuario e senha da interface web do Sunshine (https://localhost:47990)",
         f'set "SUNSHINE_USER={_bat(os.environ.get("SUNSHINE_USER", ""))}"',
         f'set "SUNSHINE_PASS={_bat(os.environ.get("SUNSHINE_PASS", ""))}"',
-        "REM tela = transmite a tela inteira com o jogo em tela cheia na frente | janela = so a janela do jogo",
-        'set "VORTEX_CAPTURA=tela"',
+        "REM janela = transmite SO a janela do jogo (recomendado) | tela = tela inteira",
+        'set "VORTEX_CAPTURA=janela"',
         "REM Opcional: dispositivo de audio a transmitir (ex.: Mixagem estereo)",
         'set "VORTEX_AUDIO="',
         "REM Segundos sem ninguem jogando ate fechar o jogo no PC",
@@ -782,7 +782,7 @@ async def host_status(user: dict = Depends(get_current_user)):
 
 async def _viewer_launch(room: dict, peer_id: str, game_id: str):
     viewer = room["viewers"].get(peer_id)
-    if room["host"]:
+    if not room["agent"] and room["host"]:
         await _send(room["host"], {"type": "launch", "game_id": game_id, "from": peer_id})
         return
     if not room["agent"]:

@@ -69,3 +69,9 @@ Usuário (PT-BR) quer um "cloud gaming" com servidor próprio para jogar jogos d
 - Sair do jogo fecha o jogo no PC (botão voltar envia quit; sem jogadores por 60s também fecha).
 - iniciar_agente.bat agora é gerado pelo site (admin), já com site, conta e Sunshine preenchidos.
 - Não testado em Windows real (ambiente Linux): validar pelo usuário.
+
+## Sessão 2026-06 (parte 6)
+- Agente: WinError 740 → .bat se auto-eleva (admin) + fallback ShellExecute runas.
+- Captura padrão = janela do jogo (VORTEX_CAPTURA=janela), Chrome reinicia captura se trocar launcher→jogo; controles re-focam o jogo automaticamente.
+- Backend: launch vai preferencialmente para o agente (host-auto substitui o Host manual).
+- Controle Xbox 360 na tela redesenhado (layout 360, deadzone radial, duplo toque = L3/R3), canal WebRTC "pad" sem retransmissão + heartbeat 100ms; botão de alternar controle no player.
