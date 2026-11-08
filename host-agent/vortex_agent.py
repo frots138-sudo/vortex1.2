@@ -662,8 +662,10 @@ async def main():
                     session_msg(t, msg, cfg, status, False)
                 else:
                     handle(msg)
+        except websockets.ConnectionClosed:
+            print("[info] a aba do navegador (Host do PC) se desconectou do agente — normal ao fechar, recarregar ou parear de novo. O PC continua ONLINE no site.")
         except Exception as e:
-            print(f"[conexão encerrada] {e}")
+            print(f"[conexão local encerrada] {e}")
         finally:
             handle({"t": "release"})
 
