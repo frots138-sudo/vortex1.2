@@ -430,10 +430,15 @@ session = Session()
 # ---------------------------------------------------------------- Sunshine
 import base64
 import ssl
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 COVERS = Path(__file__).with_name("covers")
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 VortexAgent/1.1"
+_opener = urllib.request.build_opener()
+_opener.addheaders = [("User-Agent", UA)]
+urllib.request.install_opener(_opener)  # o proxy do site bloqueia o User-Agent padrão "Python-urllib"
 
 
 def _sunshine(cfg, method, path, body=None):
@@ -524,7 +529,7 @@ def session_msg(t, m, cfg, status, stream):
 def cloud_login(site, email, password):
     req = urllib.request.Request(site.rstrip("/") + "/api/auth/login", method="POST",
                                  data=json.dumps({"email": email, "password": password}).encode(),
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json", "User-Agent": UA})
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())["token"]
 
@@ -537,7 +542,7 @@ async def cloud(cfg):
         try:
             cfg["token"] = await asyncio.to_thread(cloud_login, cfg["site"], cfg["email"], cfg["password"])
             url = cfg["site"].replace("http", "ws", 1).rstrip("/") + f"/api/ws/stream?role=agent&token={quote(cfg['token'])}"
-            async with websockets.connect(url, ping_interval=20) as ws:
+            async with websockets.connect(url, ping_interval=20, user_agent_header=UA) as ws:
                 print("[ok] conectado ao site: o PC aparece ONLINE para os jogadores")
 
                 def status(state, text):
@@ -547,6 +552,10 @@ async def cloud(cfg):
                 async for raw in ws:
                     m = json.loads(raw)
                     session_msg(m.get("type"), m, cfg, status, True)
+        except urllib.error.HTTPError as e:
+            hint = " (e-mail/senha do site errados no .bat)" if e.code == 401 else ""
+            print(f"[site] login falhou: HTTP {e.code}{hint}. Tentando de novo em 5 s…")
+            await asyncio.sleep(5)
         except Exception as e:
             print(f"[site] desconectado ({e}). Tentando de novo em 5 s…")
             await asyncio.sleep(5)

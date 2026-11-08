@@ -660,7 +660,7 @@ async def download_agent_bat(site: str, user: dict = Depends(require_admin)):
         "REM Segundos sem ninguem jogando ate fechar o jogo no PC",
         'set "VORTEX_FECHAR_APOS=60"',
         'cd /d "%~dp0"',
-        "python -m pip install -r requirements.txt",
+        "python -m pip install --disable-pip-version-check -q websockets pillow vgamepad",
         "python vortex_agent.py",
         "pause", "",
     ]
